@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <!-- Importar archivos de estilo y scripts -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/twitter-bootstrap/5.3.0/css/bootstrap.min.css">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.6.0/jquery.min.js"></script>
+  <script src="https://cdn.ckeditor.com/4.16.2/standard/ckeditor.js"></script>
+  <style>
+    /* Estilos para el editor */
+    #editor {
+      border: 1px solid #ced4da;
+      padding: 10px;
+      height: 300px;
+      font-family: Arial, sans-serif;
+      font-size: 14px;
+      line-height: 1.5;
+      color: #212529;
+      background-color: #fff;
+    }
+  </style>
+</head>
+<body>
+  <div class="wrapper">
+    <div class="content-wrapper">
+      <h2>Editor de Word</h2>
+      <!-- Input para seleccionar un archivo Word -->
+      <input type="file" id="fileInput" accept=".doc,.docx">
+    </div>
+  </div>
+
+  <!-- Modal para mostrar el contenido del archivo -->
+  <div class="modal fade" id="fileModal" tabindex="-1" aria-labelledby="fileModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-lg">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title" id="fileModalLabel">Contenido del archivo</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <div class="modal-body">
+          <!-- Editor CKEditor para mostrar y editar el contenido del archivo -->
+          <div id="editor"></div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cerrar</button>
+          <button type="button" class="btn btn-primary" id="sendButton">Enviar</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal para ingresar el correo electrónico -->
+  <div class="modal fade" id="emailModal" tabindex="-1" aria-labelledby="emailModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title" id="emailModalLabel">Ingresa tu correo electrónico</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <div class="modal-body">
+          <!-- Formulario para ingresar el correo electrónico -->
+          <form id="emailForm">
+            <div class="mb-3">
+              <label for="emailInput" class="form-label">Correo electrónico</label>
+              <input type="email" class="form-control" id="emailInput" required>
+            </div>
+          </form>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+          <button type="submit" form="emailForm" class="btn btn-primary" id="sendEmailButton">Enviar</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Importar scripts adicionales -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.7.1/jszip.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/twitter-bootstrap/5.3.0/js/bootstrap.bundle.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.4.0/jspdf.umd.min.js"></script>
+
+  <script>
+    $(document).ready(function() {
+      var fileInput = document.getElementById('fileInput');
+      var editor = null;
+
+      fileInput.addEventListener('change', function(event) {
+        var file = event.target.files[0];
+
+        var reader = new FileReader();
+        reader.onload = function(e) {
+          var arrayBuffer = e.target.result;
+          var wordArray = new Uint8Array(arrayBuffer);
+
+          // Leer el archivo Word utilizando la biblioteca JSZip
+          JSZip.loadAsync(wordArray)
+            .then(function(zip) {
+              // Extraer el archivo document.xml del archivo Word
+              return zip.file('word/document.xml').async('string');
+            })
+            .then(function(xml) {
+              // Analizar el XML para extraer el contenido y los estilos
+              var parser = new DOMParser();
+              var xmlDoc = parser.parseFromString(xml, 'text/xml');
+              var paragraphs = xmlDoc.getElementsByTagName('w:p');
+              var content = '';
+
+              for (var i = 0; i < paragraphs.length; i++) {
+                var paragraph = paragraphs[i];
+                var paragraphText = '';
+
+                // Extraer el contenido de texto del párrafo
+                var textNodes = paragraph.getElementsByTagName('w:t');
+                for (var j = 0; j < textNodes.length; j++) {
+                  paragraphText += textNodes[j].textContent;
+                }
+
+                // Extraer los estilos del párrafo
+                var paragraphStyle = paragraph.getAttribute('w:pStyle');
+
+                // Aplicar los estilos al párrafo
+                if (paragraphStyle) {
+                  content += '<p class="' + paragraphStyle + '">' + paragraphText + '</p>';
+                } else {
+                  content += '<p>' + paragraphText + '</p>';
+                }
+              }
+
+              if (editor) {
+                editor.destroy();
+              }
+
+              // Crear una nueva instancia de CKEditor
+              editor = CKEDITOR.replace('editor', {
+                // Configuración adicional de CKEditor si es necesario
+              });
+
+              // Establecer el contenido en el editor
+              editor.setData(content);
+
+              $('#fileModal').modal('show');
+            })
+            .catch(function(error) {
+              console.error('Error al cargar el archivo de Word:', error);
+            });
+        };
+
+        reader.readAsArrayBuffer(file);
+      });
+
+      // Mostrar el modal cuando se hace clic en el botón de abrir
+      $('#openModalButton').click(function() {
+        $('#fileModal').modal('show');
+      });
+
+      // Destruir CKEditor al cerrar el modal
+      $('#fileModal').on('hidden.bs.modal', function () {
+        if (editor) {
+          editor.destroy();
+        }
+      });
+
+      // Manejar el clic en el botón de enviar
+      $('#sendButton').click(function() {
+        // Mostrar el modal del formulario de correo electrónico
+        $('#emailModal').modal('show');
+      });
+
+      // Manejar el envío del formulario de correo electrónico
+      $('#emailForm').submit(function(event) {
+        event.preventDefault();
+        var email = $('#emailInput').val();
+        var content = editor.getData();
+
+        // Realizar la solicitud AJAX
+        $.ajax({
+          url: '/users/send-email',
+          method: 'POST',
+          data: {
+            email: email,
+            content: content
+          },
+          success: function(response) {
+            alert('Correo enviado exitosamente.');
+            // Manejar la respuesta exitosa
+          },
+          error: function(error) {
+            alert('Error al enviar el correo. Por favor, inténtalo nuevamente.');
+            console.error(error);
+            // Manejar el error
+          }
+        });
+
+        // Cerrar el modal del formulario de correo electrónico
+        $('#emailModal').modal('hide');
+        // Cerrar el modal del archivo
+        $('#fileModal').modal('hide');
+      });
+    });
+  </script>
+</body>
+</html>

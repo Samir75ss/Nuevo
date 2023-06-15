@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <!-- Importar archivos de estilo y scripts -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/twitter-bootstrap/5.3.0/css/bootstrap.min.css">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.6.0/jquery.min.js"></script>
+  <script src="https://cdn.ckeditor.com/4.16.2/standard/ckeditor.js"></script>
+  <style>
+    /* Estilos para el editor */
+    #editor {
+      border: 1px solid #ced4da;
+      padding: 10px;
+      height: 300px;
+      font-family: Arial, sans-serif;
+      font-size: 14px;
+      line-height: 1.5;
+      color: #212529;
+      background-color: #fff;
+    }
+  </style>
+</head>
+<body>
+  <div class="wrapper">
+    <div class="content-wrapper">
+      <h2>Profesor - enviar y editar archivos</h2>
+      <!-- Input para seleccionar múltiples archivos Word -->
+      <input type="file" id="fileInput" accept=".doc,.docx" multiple>
+      <br><br>
+      <!-- Lista para mostrar los archivos seleccionados -->
+      <ul id="fileList" class="list-group"></ul>
+    </div>
+  </div>
+
+  <!-- Modal para mostrar el contenido del archivo -->
+  <div class="modal fade" id="fileModal" tabindex="-1" aria-labelledby="fileModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-lg">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title" id="fileModalLabel">Contenido del archivo</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <div class="modal-body">
+          <!-- Editor CKEditor para mostrar y editar el contenido del archivo -->
+          <div id="editor"></div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cerrar</button>
+          <button type="button" class="btn btn-primary" id="sendButton">Enviar</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal para ingresar el correo electrónico -->
+  <div class="modal fade" id="emailModal" tabindex="-1" aria-labelledby="emailModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title" id="emailModalLabel">Ingresa tu correo electrónico</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <div class="modal-body">
+          <!-- Formulario para ingresar el correo electrónico -->
+          <form id="emailForm">
+            <div class="mb-3">
+              <label for="emailInput" class="form-label">Correo electrónico</label>
+              <input type="email" class="form-control" id="emailInput" required>
+            </div>
+          </form>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+          <button type="submit" form="emailForm" class="btn btn-primary" id="sendEmailButton">Enviar</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Importar scripts adicionales -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.7.1/jszip.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/twitter-bootstrap/5.3.0/js/bootstrap.bundle.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.4.0/jspdf.umd.min.js"></script>
+
+<script>
+  $(document).ready(function() {
+    var fileInput = document.getElementById('fileInput');
+    var editor = null;
+    var selectedFiles = []; // Almacena los archivos seleccionados
+
+    fileInput.addEventListener('change', function(event) {
+      var files = event.target.files;
+
+      // Mostrar la lista de archivos seleccionados
+      for (var i = 0; i < files.length; i++) {
+        var file = files[i];
+        selectedFiles.push(file); // Agregar archivo a la lista
+
+        var listItem = document.createElement('li');
+        listItem.classList.add('list-group-item');
+        listItem.textContent = file.name;
+        var editButton = document.createElement('button');
+        editButton.classList.add('btn', 'btn-primary', 'btn-sm', 'ms-2');
+        editButton.textContent = 'Editar';
+        editButton.dataset.index = i;
+        listItem.appendChild(editButton);
+        $('#fileList').append(listItem);
+      }
+    });
+
+    // Mostrar el modal cuando se hace clic en el botón de editar
+    $(document).on('click', '#fileList button', function() {
+      var index = parseInt($(this).data('index'));
+      var file = selectedFiles[index]; // Obtener archivo de la lista
+
+      var reader = new FileReader();
+      reader.onload = function(e) {
+        var arrayBuffer = e.target.result;
+        var wordArray = new Uint8Array(arrayBuffer);
+
+        JSZip.loadAsync(wordArray)
+          .then(function(zip) {
+            return zip.file('word/document.xml').async('string');
+          })
+          .then(function(xml) {
+            var parser = new DOMParser();
+            var xmlDoc = parser.parseFromString(xml, 'text/xml');
+            var paragraphs = xmlDoc.getElementsByTagName('w:p');
+            var content = '';
+
+            for (var i = 0; i < paragraphs.length; i++) {
+              var paragraph = paragraphs[i];
+              var paragraphText = '';
+              var textNodes = paragraph.getElementsByTagName('w:t');
+
+              for (var j = 0; j < textNodes.length; j++) {
+                paragraphText += textNodes[j].textContent;
+              }
+
+              var paragraphStyle = paragraph.getAttribute('w:pStyle');
+
+              if (paragraphStyle) {
+                content += '<p class="' + paragraphStyle + '">' + paragraphText + '</p>';
+              } else {
+                content += '<p>' + paragraphText + '</p>';
+              }
+            }
+
+            if (editor) {
+              editor.destroy();
+            }
+
+            editor = CKEDITOR.replace('editor', {
+              // Configuración adicional de CKEditor si es necesario
+            });
+
+            editor.setData(content);
+
+            $('#fileModal').modal('show');
+          })
+          .catch(function(error) {
+            console.error('Error al cargar el archivo de Word:', error);
+          });
+      };
+
+      reader.readAsArrayBuffer(file);
+    });
+
+    // Destruir CKEditor al cerrar el modal
+    $('#fileModal').on('hidden.bs.modal', function () {
+      if (editor) {
+        editor.destroy();
+      }
+    });
+
+    $('#sendButton').click(function() {
+      $('#emailModal').modal('show');
+    });
+
+    $('#emailForm').submit(function(event) {
+      event.preventDefault();
+      var email = $('#emailInput').val();
+      var content = editor.getData();
+
+      $.ajax({
+        url: '/users/send-email',
+        method: 'POST',
+        data: {
+          email: email,
+          content: content
+        },
+        success: function(response) {
+          alert('Correo enviado exitosamente.');
+        },
+        error: function(error) {
+          alert('Error al enviar el correo. Por favor, inténtalo nuevamente.');
+          console.error(error);
+        }
+      });
+
+      $('#emailModal').modal('hide');
+      $('#fileModal').modal('hide');
+    });
+  });
+</script>
+
+
+
+</body>
+</html>

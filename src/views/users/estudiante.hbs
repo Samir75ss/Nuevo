@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <!-- Importar archivos de estilo y scripts -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/twitter-bootstrap/5.3.0/css/bootstrap.min.css">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.6.0/jquery.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.7.1/jszip.min.js"></script>
+</head>
+<body>
+  <h1>Bienvenido Estudiante</h1>
+  <p>Hola {{name}}, ¡bienvenido(a) como estudiante!</p>
+
+  <!-- Tabla para mostrar los archivos -->
+  <table class="table">
+    <thead>
+      <tr>
+        <th>Nombre del Archivo</th>
+        <th>Contenido</th>
+        <th>Acciones</th>
+      </tr>
+    </thead>
+    <tbody id="fileTableBody"></tbody>
+  </table>
+
+  <!-- Botón de logout -->
+  <a href="/users/logout" class="logout-button">Logout</a>
+
+  <script>
+    $(document).ready(function() {
+      var fileTableBody = document.getElementById('fileTableBody');
+
+      // Ejemplo de datos de archivos del profesor
+      var professorFiles = [
+        { name: 'Archivo Profesor 1.docx', content: 'Contenido del Archivo del Profesor 1' },
+        { name: 'Archivo Profesor 2.docx', content: 'Contenido del Archivo del Profesor 2' },
+        { name: 'Archivo Profesor 3.docx', content: 'Contenido del Archivo del Profesor 3' }
+      ];
+
+      // Generar filas de tabla para cada archivo del profesor
+      professorFiles.forEach(function(file) {
+        var row = document.createElement('tr');
+
+        var nameCell = document.createElement('td');
+        nameCell.textContent = file.name;
+
+        var contentCell = document.createElement('td');
+        contentCell.textContent = file.content;
+
+        var actionsCell = document.createElement('td');
+        var editButton = document.createElement('button');
+        editButton.textContent = 'Editar';
+        actionsCell.appendChild(editButton);
+
+        row.appendChild(nameCell);
+        row.appendChild(contentCell);
+        row.appendChild(actionsCell);
+
+        fileTableBody.appendChild(row);
+      });
+    });
+  </script>
+</body>
+</html>
